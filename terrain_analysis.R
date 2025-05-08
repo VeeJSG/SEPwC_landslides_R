@@ -1,14 +1,18 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages({
 library(argparse)
+library(terra)
+library(sf)
+library(randomForest)
 })
 
-extract_values_from_raster<-function(raster_stack, shapefile) {
-
-    return()
-
-}
-
+#extract_values_from_raster<-function(raster_stack, shapefile) {
+ # raster_stack <- c(rast("data/AW3D30.tif"), rast("data/Geology.tif"), rast("data/Landcover.tif"))
+  #shapefile <- c(vect("data/landslides.shp"), vect("data/Confirmed_faults.shp")) ##Generates warning: [vect] z coordinates ignored
+  #values(raster_stack)
+#}
+##Fails tests due to hard coding
+##Missing return() function
 
 create_dataframe<-function(raster_stack, shapefile, landslide) {
 
@@ -61,3 +65,5 @@ if(sys.nframe() == 0) {
     args = parser$parse_args()  
     main(args)
 }
+
+##Copyright 2025 Viera Gnahore. CC-BY-SA 
