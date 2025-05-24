@@ -32,8 +32,13 @@ make_classifier<-function(dataframe) {
 }
 
 make_probability_raster<-function(raster_stack, classifier) {
-
-  return()
+  probability_raster <- predict(object = classifier, data = raster_stack, type = "prob")
+    #uses classifier from make_classifier
+    #type=prob ensures outputs are probabilities
+    #uses raster_stack from extract values
+  landslide_prob_raster <- probability_raster[["1"]] 
+    #1 indicates where positive landslide probability
+  return(landslide_prob_raster)
 }
 
 
@@ -43,17 +48,21 @@ main <- function(args) {
   geology <- rast(args$geology)
   landcover <- rast(args$landcover)
   
+  raster <- c(topography, geology, landcover) #creates a raster stack
+  
   #takes arguments using shapefiles and loads the files
-  faults <- vect(args$faults)
-  landslides <- vect(args$landslides)
+  fault_vect <- vect(args$faults)
+  landslide_vect <- vect(args$landslides)
   
-  raster <- c(topography, geology, landcover) ##creates a raster stack
-  points <- c(faults, landslides) ##creates a vector stack
+  points <- c(fault_vect, landslide_vect) #turns collection into single vector
   
-  #calls all of the functions
-  extract_values_from_raster(raster, points)
-  create_dataframe(raster, points, landslide)
-  make_classifier(dataframe)
+  #Assigns 0s to areas w/o landslides and 1s to areas w/ landslides
+  landslide_binary <- c(rep(0, nrow(fault_vect)), rep(1, nrow(landslide_vect)))
+  
+  #calls the functions
+  dataframe <- create_dataframe(raster, points, landslide_binary)
+  classifier<- make_classifier(dataframe)
+  make_probability_raster(raster, classifier)
   
 }
 
