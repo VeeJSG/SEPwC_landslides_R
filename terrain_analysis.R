@@ -4,15 +4,16 @@ library(argparse)
 library(terra)
 library(sf)
 library(randomForest)
+library(dplyr)
 })
 
-#extract_values_from_raster<-function(raster_stack, shapefile) {
- # raster_stack <- c(rast("data/AW3D30.tif"), rast("data/Geology.tif"), rast("data/Landcover.tif"))
-  #shapefile <- c(vect("data/landslides.shp"), vect("data/Confirmed_faults.shp")) ##Generates warning: [vect] z coordinates ignored
-  #values(raster_stack)
-#}
-##Fails tests due to hard coding
-##Missing return() function
+extract_values_from_raster<-function(raster_stack, shapefile) {
+  extracted_values <- extract(raster_stack, shapefile) 
+  values_dataframe <- as.data.frame(extracted_values) #turns extracted values into a usable data frame
+  values_dataframe <- values_dataframe %>% select(-ID) #Removes the ID column from the data frame
+  return(values_dataframe)
+}
+
 
 create_dataframe<-function(raster_stack, shapefile, landslide) {
 
@@ -31,7 +32,21 @@ make_probability_raster<-function(raster_stack, classifier) {
 
 
 main <- function(args) {
-
+  #takes arguments using rasters and loads the files
+  topography <- rast(args$topography)
+  geology <- rast(args$geology)
+  landcover <- rast(args$landcover)
+  
+  #takes arguments using shapefiles and loads the files
+  faults <- vect(args$faults)
+  landslides <- vect(args$landslides)
+  
+  raster <- c(topography, geology, landcover) ##creates a raster stack
+  points <- c(faults, landslides) ##creates a vector stack
+  
+  #calls all of the functions
+  extract_values_from_raster(raster, points)
+  
 }
 
 if(sys.nframe() == 0) {
