@@ -10,24 +10,27 @@ library(dplyr)
 extract_values_from_raster<-function(raster_stack, shapefile) {
   extracted_values <- extract(raster_stack, shapefile) 
   values_dataframe <- as.data.frame(extracted_values) #turns extracted values into a usable data frame
-  values_dataframe <- values_dataframe %>% select(-ID) #Removes the ID column from the data frame
+  values_dataframe <- subset(values_dataframe, select = -ID) #Removes the ID column from the data frame
+    ##using subset instead of dplyr to resolve issues with duplicate names error
   return(values_dataframe)
 }
 
 
 create_dataframe<-function(raster_stack, shapefile, landslide) {
-
-    return()
+  dataframe_created <- extract_values_from_raster(raster_stack, shapefile)
+  dataframe_created$ls <- as.factor(landslide) #addresses numeric is not factor error in test
+  return(dataframe_created)
 
 }
 
 make_classifier<-function(dataframe) {
-    return()
+    
+  return()
 }
 
 make_probability_raster<-function(raster_stack, classifier) {
 
-    return()
+  return()
 }
 
 
@@ -46,6 +49,7 @@ main <- function(args) {
   
   #calls all of the functions
   extract_values_from_raster(raster, points)
+  create_dataframe(raster, points, landslide)
   
 }
 
