@@ -24,8 +24,11 @@ create_dataframe<-function(raster_stack, shapefile, landslide) {
 }
 
 make_classifier<-function(dataframe) {
-    
-  return()
+  classifier <- randomForest(formula = ls ~ ., data = dataframe, ntree = 500, importance = TRUE)
+    #calls function from randomForest library/package
+    #uses ls similarly to create_dataframe
+    #uses 500 for default number of decision trees;can be altered if necessary
+  return(classifier)
 }
 
 make_probability_raster<-function(raster_stack, classifier) {
@@ -50,6 +53,7 @@ main <- function(args) {
   #calls all of the functions
   extract_values_from_raster(raster, points)
   create_dataframe(raster, points, landslide)
+  make_classifier(dataframe)
   
 }
 

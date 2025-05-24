@@ -29,3 +29,6 @@ test_that("create_dataframe", {
   expected <- as.factor(expected)
   expect_equal(df$ls, expected)
 })
+
+##Snippet of test_script.R
+##Isolated to make testing create_dataframe easier/result clearer
