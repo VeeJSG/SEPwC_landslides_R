@@ -51,12 +51,13 @@ main <- function(args) {
   
   #takes arguments using shapefiles and loads the files
   fault_vect <- vect(args$faults) #warning: z coordinates ignored
-  fault_vect <- sf::st_as_sf(fault_vect) #passing object from terra to sf
-  fault_vect <- sf::st_polygonize(fault_vect) #converts geometry from lines to polygons
+  starting_fault_vect <- sf::st_as_sf(fault_vect) #passes object from terra to sf
+  fault_vect_poly <- sf::st_buffer(starting_fault_vect, dist = 10) #converts geometry from lines to polygons
+  fault_vect <- vect(fault_vect_poly) #returns object to terra from sf
   
   landslide_vect <- vect(args$landslides) #warning: z coordinates ignored
   
-  points <- vect(c(fault_vect, landslide_vect)) #turns collection into single vector
+  points <- terra::merge(fault_vect, landslide_vect) #turns collection into single vector
   
   #Assigns 0s to areas w/o landslides and 1s to areas w/ landslides
   landslide_binary <- c(rep(0, nrow(fault_vect)), rep(1, nrow(landslide_vect)))
