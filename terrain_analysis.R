@@ -4,7 +4,6 @@ library(argparse)
 library(terra)
 library(sf)
 library(randomForest)
-library(dplyr)
 })
 
 extract_values_from_raster<-function(raster_stack, shapefile) {
@@ -18,7 +17,7 @@ extract_values_from_raster<-function(raster_stack, shapefile) {
 
 create_dataframe<-function(raster_stack, shapefile, landslide) {
   dataframe_created <- extract_values_from_raster(raster_stack, shapefile)
-  dataframe_created$ls <- as.factor(landslide) #addresses numeric is not factor error in test
+  dataframe_created$ls <- as.factor(landslide) #addresses "numeric is not factor" error in test
   return(dataframe_created)
 
 }
@@ -51,10 +50,13 @@ main <- function(args) {
   raster <- c(topography, geology, landcover) #creates a raster stack
   
   #takes arguments using shapefiles and loads the files
-  fault_vect <- vect(args$faults)
-  landslide_vect <- vect(args$landslides)
+  fault_vect <- vect(args$faults) #warning: z coordinates ignored
+  fault_vect <- sf::st_as_sf(fault_vect) #passing object from terra to sf
+  fault_vect <- sf::st_polygonize(fault_vect) #converts geometry from lines to polygons
   
-  points <- c(fault_vect, landslide_vect) #turns collection into single vector
+  landslide_vect <- vect(args$landslides) #warning: z coordinates ignored
+  
+  points <- vect(c(fault_vect, landslide_vect)) #turns collection into single vector
   
   #Assigns 0s to areas w/o landslides and 1s to areas w/ landslides
   landslide_binary <- c(rep(0, nrow(fault_vect)), rep(1, nrow(landslide_vect)))
@@ -63,7 +65,6 @@ main <- function(args) {
   dataframe <- create_dataframe(raster, points, landslide_binary)
   classifier<- make_classifier(dataframe)
   make_probability_raster(raster, classifier)
-  
 }
 
 if(sys.nframe() == 0) {
