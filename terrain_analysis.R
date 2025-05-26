@@ -10,7 +10,7 @@ extract_values_from_raster<-function(raster_stack, shapefile) {
   extracted_values <- extract(raster_stack, shapefile)
   values_dataframe <- as.data.frame(extracted_values) #turns extracted values into a usable data frame
   values_dataframe <- subset(values_dataframe, select = -ID) #Removes the ID column from the data frame
-    ##using subset instead of dplyr to resolve issues with duplicate names error
+  ##using subset instead of dplyr to resolve issues with duplicate names error
   return(values_dataframe)
 }
 
