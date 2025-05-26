@@ -7,7 +7,7 @@ library(randomForest)
 })
 
 extract_values_from_raster<-function(raster_stack, shapefile) {
-  extracted_values <- extract(raster_stack, shapefile) 
+  extracted_values <- extract(raster_stack, shapefile)
   values_dataframe <- as.data.frame(extracted_values) #turns extracted values into a usable data frame
   values_dataframe <- subset(values_dataframe, select = -ID) #Removes the ID column from the data frame
     ##using subset instead of dplyr to resolve issues with duplicate names error
@@ -16,8 +16,9 @@ extract_values_from_raster<-function(raster_stack, shapefile) {
 
 
 create_dataframe<-function(raster_stack, shapefile, landslide) {
-  dataframe_created <- extract_values_from_raster(raster_stack, shapefile)
-  dataframe_created$ls <- as.factor(landslide) #addresses "numeric is not factor" error in test
+  messy_dataframe_created <- extract_values_from_raster(raster_stack, shapefile)
+  messy_dataframe_created$ls <- as.factor(landslide) #addresses "numeric is not factor" error in test
+  dataframe_created <- na.omit(messy_dataframe_created) #addresses NAs and associated errors
   return(dataframe_created)
 
 }
@@ -42,30 +43,80 @@ make_probability_raster<-function(raster_stack, classifier) {
 
 
 main <- function(args) {
-  #takes arguments using rasters and loads the files
   topography <- rast(args$topography)
   geology <- rast(args$geology)
   landcover <- rast(args$landcover)
   
-  raster <- c(topography, geology, landcover) #creates a raster stack
+  raster_stack <- c(topography, geology, landcover) #creates a raster stack
   
   #takes arguments using shapefiles and loads the files
-  fault_vect <- vect(args$faults) #warning: z coordinates ignored
-  starting_fault_vect <- sf::st_as_sf(fault_vect) #passes object from terra to sf
-  fault_vect_poly <- sf::st_buffer(starting_fault_vect, dist = 10) #converts geometry from lines to polygons
+  fault_vect <- vect(args$faults) ##warning: z coordinates ignored
+  sf_fault_vect <- sf::st_as_sf(fault_vect) #passes object from terra to sf
+  simple_fault_vect <- sf::st_simplify(sf_fault_vect, dTolerance = 20) #Reduces loading speed/issues with terra::merge
+  fault_vect_poly <- sf::st_buffer(simple_fault_vect, dist = 1) #converts geometry from lines to polygons
   fault_vect <- vect(fault_vect_poly) #returns object to terra from sf
   
-  landslide_vect <- vect(args$landslides) #warning: z coordinates ignored
+  landslide_vect <- vect(args$landslides) ##warning: z coordinates ignored
+  sf_landslide_vect <- sf::st_as_sf(landslide_vect) #passes object from terra to sf
+  simple_landslide_vect <- sf::st_simplify(sf_landslide_vect, dTolerance = 20) #Reduces loading speed/issues with terra::merge
+    #set at 20 for consistency; previous tests show high dTolerance causes issues
+  landslide_vect <- vect(simple_landslide_vect)
   
-  points <- terra::merge(fault_vect, landslide_vect) #turns collection into single vector
+  #Points that are positive for landslides
+  positive_for_landslides <- terra::merge(fault_vect, landslide_vect) #turns collection into single vector
+  sf_positive_for_landslides <- sf::st_as_sf(positive_for_landslides) #passes object from terra to sf
+  simple_positive_for_landslides <- sf::st_simplify(sf_positive_for_landslides, dTolerance = 20) #Addresses std::bad_alloc issue in tests
+  positive_for_landslides <- vect(simple_positive_for_landslides)
   
-  #Assigns 0s to areas w/o landslides and 1s to areas w/ landslides
-  landslide_binary <- c(rep(0, nrow(fault_vect)), rep(1, nrow(landslide_vect)))
+  positive_sample <- spatSample(landslide_vect, size = 50, method = "random") #generates random points as a sample
+  values(positive_sample)$ls <- factor(rep(1, nrow(positive_sample)), levels = c("0", "1"))
+ 
+  #Samples points from entire area
+  random_points_sampling_extent <- terra::ext(raster_stack)
+  
+  #Uses extent to designate minimum and maximum values
+  xmin_val <- random_points_sampling_extent[1]
+  xmax_val <- random_points_sampling_extent[2]
+  ymin_val <- random_points_sampling_extent[3]
+  ymax_val <- random_points_sampling_extent[4]
+  
+  num_points_random <- 100000
+  
+  # Generate random X and Y coordinates within the extent
+  random_x <- runif(num_points_random, min = xmin_val, max = xmax_val)
+  random_y <- runif(num_points_random, min = ymin_val, max = ymax_val)
+  
+  # Combine into a data.frame
+  random_coords_df <- data.frame(x = random_x, y = random_y)
+  
+  # Convert to SpatVector, ensuring the correct CRS
+  random_points <- vect(random_coords_df, geom=c("x", "y"), crs = crs(raster_stack))
+  
+  #Compares positive points to all points 
+  overlap <- unique(terra::relate(random_points, positive_for_landslides, "intersects", pairs = TRUE))
+  overlap_indices <- unique(overlap [, 1])
+  
+  #Identifies points that did not overlap (ie no landslides)
+  no_landslide_points <- random_points[-overlap_indices, ]
+  
+  sample_indices <- sample(x = 1:nrow(no_landslide_points), size = min(50, nrow(no_landslide_points)), replace = FALSE)
+  sample_no_landslide <- no_landslide_points[sample_indices, ]
+  
+  values(sample_no_landslide)$ls <- factor(rep(0, nrow(sample_no_landslide)), levels = c("0", "1"))
+  
+  #Combines negative and positive points for terrain analysis
+  terrain_analysis_points <- terra::merge(positive_sample, sample_no_landslide)
+  
+  #Assigns 1s to areas w landslides and 0s to areas w/o landslides
+  landslide_binary <- c(rep(1, nrow(positive_sample)), rep(0, nrow(sample_no_landslide)))
   
   #calls the functions
-  dataframe <- create_dataframe(raster, points, landslide_binary)
+  dataframe <- create_dataframe(raster_stack, terrain_analysis_points, landslide_binary)
   classifier<- make_classifier(dataframe)
-  make_probability_raster(raster, classifier)
+  
+  #saves the output of the function as a raster
+  probability_raster_output <- make_probability_raster(raster_stack, classifier)
+  writeRaster(probability_raster_output, args$output, overwrite=TRUE)
 }
 
 if(sys.nframe() == 0) {
